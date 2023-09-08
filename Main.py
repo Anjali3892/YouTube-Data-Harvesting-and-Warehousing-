@@ -34,7 +34,7 @@ db = client['Youtube']
 
 #----------------------------Connecting withmysql------------------------------------------------------
 mydb = mysql.connector.connect(host="localhost",
-                   user="root@localhost",
+                   user="root",
                    password="mysql@123",
                    database= "youtube"
                   )
