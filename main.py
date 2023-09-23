@@ -1,10 +1,10 @@
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-api_key = 'AIzaSyAj2jBh5IgHM3Ia1v885uvuvEB9J32n2to'
+api_key = 'AIzaSyDg3-srlMiDE9PlHIue2z6NzaNp_UpJMjE'
 youtube = build('youtube', 'v3', developerKey=api_key)
 
-def get_channel_stats(api_key, channel_id):
+def get_channel_stats(channel_id):
     
     request = youtube.channels().list(
         part="snippet, contentDetails, statistics, status, topicDetails",
@@ -29,7 +29,7 @@ def get_channel_stats(api_key, channel_id):
     return data
 
 
-def get_video_ids(api_key, playlist_id):
+def get_video_ids(playlist_id):
     
     request = youtube.playlistItems().list(
         part="contentDetails",
@@ -68,7 +68,7 @@ def get_video_ids(api_key, playlist_id):
     return video_ids
 
 
-def get_video_details(api_key, video_ids):
+def get_video_details(video_ids):
    
     video_stats = []
 
@@ -102,7 +102,7 @@ def get_video_details(api_key, video_ids):
     return video_stats
 
 
-def get_video_comments(api_key, video_ids):
+def get_video_comments(video_ids):
     
     comments = []
 
@@ -155,12 +155,12 @@ def get_video_comments(api_key, video_ids):
     return comments
 
 
-def bind_data(api_key, channel_id):
-    channel_stats = get_channel_stats(api_key, channel_id)
+def bind_data(channel_id):
+    channel_stats = get_channel_stats(channel_id)
     playlist_id = channel_stats['Playlist_Id']
-    video_ids = get_video_ids(api_key, playlist_id)
-    video_details = get_video_details(api_key, video_ids)
-    video_comments = get_video_comments(api_key, video_ids)
+    video_ids = get_video_ids(playlist_id)
+    video_details = get_video_details(video_ids)
+    video_comments = get_video_comments(video_ids)
 
     data = {
         "Channel_Name": channel_stats
