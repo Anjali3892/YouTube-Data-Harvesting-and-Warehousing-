@@ -1,15 +1,14 @@
 from pymongo import MongoClient
 from main import bind_data
 
-def upload_to_MongoDB(api_key, channel_id):
-    
-    
+def upload_to_MongoDB(channel_id):
+        
     client = MongoClient(f"mongodb+srv://anjaliteclogos:youtubeproject@cluster1.h6tdifo.mongodb.net/?retryWrites=true&w=majority")
     
-    upload = bind_data(api_key, channel_id)
+    upload = bind_data(channel_id)
     
     database = client.Youtube
-    collection = database.youtube_data
+    collection = database.youtubedata
     
     try:
         existing_document = collection.find_one({"Channel_Name.Channel_Id": channel_id})
@@ -29,7 +28,7 @@ def view_channel_name():
     client = MongoClient(f"mongodb+srv://anjaliteclogos:youtubeproject@cluster1.h6tdifo.mongodb.net/?retryWrites=true&w=majority")
     
     database = client.Youtube
-    collection = database.youtube_data
+    collection = database.youtubedata
     
     try:
         names = []
