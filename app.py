@@ -1,186 +1,248 @@
+from main import bind_data
+from mongodb_connect import *
+from data_mongodb import *
+from SQL_db import *
+from analysis import *
+import streamlit as st
+import time
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 api_key = 'AIzaSyDg3-srlMiDE9PlHIue2z6NzaNp_UpJMjE'
 youtube = build('youtube', 'v3', developerKey=api_key)
 
-def get_channel_stats(channel_id):
+def main():
     
-    request = youtube.channels().list(
-        part="snippet, contentDetails, statistics, status, topicDetails",
-        id=channel_id
+    st.set_page_config(
+            page_title="YouTube Data Harvesting",
+            page_icon= "youtubeMain.png",
+            layout="wide"
     )
-
-    response = request.execute()
-
-    topic_categories = response['items'][0]['topicDetails']['topicCategories']
-
-    data = {
-        "Channel_Name": response['items'][0]['snippet']['title'],
-        "Channel_Id": response['items'][0]['id'],
-        "Subscription_Count": response['items'][0]['statistics']['subscriberCount'],
-        "Channel_Views": response['items'][0]['statistics']['viewCount'],
-        "Channel_Description": response['items'][0]['snippet']['description'],
-        "Playlist_Id": response['items'][0]['contentDetails']['relatedPlaylists']['uploads'],
-        "Channel_Status": response['items'][0]['status']['privacyStatus'],
-        "Channel_Type": topic_categories[0].split('/')[-1]
-    }
-
-    return data
-
-
-def get_video_ids(playlist_id):
-    
-    request = youtube.playlistItems().list(
-        part="contentDetails",
-        playlistId=playlist_id,
-        maxResults=50
-    )
-
-    response = request.execute()
-
-    video_ids = []
-
-    for i in range(len(response['items'])):
-        video_ids.append(response['items'][i]['contentDetails']['videoId'])
-
-    next_page_token = response.get('nextPageToken')
-    more_pages = True
-
-    while more_pages:
-        if next_page_token is None:
-            more_pages = False
-        else:
-            request = youtube.playlistItems().list(
-                part="contentDetails",
-                playlistId=playlist_id,
-                maxResults=50,
-                pageToken=next_page_token
-            )
-
-            response = request.execute()
-
-            for i in range(len(response['items'])):
-                video_ids.append(response['items'][i]['contentDetails']['videoId'])
-
-            next_page_token = response.get('nextPageToken')
-
-    return video_ids
-
-
-def get_video_details(video_ids):
    
-    video_stats = []
-
-    for i in range(0, len(video_ids), 50):
-        request = youtube.videos().list(
-            part="snippet, statistics, contentDetails",
-            id=','.join(video_ids[i:i + 50])
-        )
-
-        response = request.execute()
-
-        for video in response['items']:
-            data = {
-                "Video_Id": video['id'],
-                "Video_Name": video['snippet']['title'],
-                "Video_Description": video['snippet']['description'],
-                "Tags": video['snippet'].get('tags'),
-                "PublishedAt": video['snippet']['publishedAt'],
-                "View_Count": video['statistics']['viewCount'],
-                "Like_Count": video['statistics'].get('likeCount'),
-                "Dislike_Count": video['statistics'].get('dislikeCount'),
-                "Favorite_Count": video['statistics']['favoriteCount'],
-                "Comment_Count": video['statistics'].get('commentCount'),
-                "Duration": video['contentDetails']['duration'],
-                "Thumbnail": video['snippet']['thumbnails']['default']['url'],
-                "Caption_Status": video['contentDetails']['caption']
-            }
-
-            video_stats.append(data)
-
-    return video_stats
-
-
-def get_video_comments(video_ids):
+    st.image('youtubeMain.png',width=150)
+    title = '<p style="font-family:Times New Roman; color:#FF0000; font-size: 48px;">YouTube Data Harvesting and Warehousing</p>'
+    st.markdown(title, unsafe_allow_html=True)
     
-    comments = []
-
-    for video_id in video_ids:
-        try:
-            request = youtube.commentThreads().list(
-                part="snippet",
-                videoId=video_id,
-                maxResults=50
-            )
-
-            while request:
-                response = request.execute()
-
-                for comment in response['items']:
-                    data = {
-                        'Video_Id': video_id,
-                        'Comment_Id': comment['snippet']['topLevelComment']['id'],
-                        'Comment_Text': comment['snippet']['topLevelComment']['snippet']['textOriginal'],
-                        'Comment_Author': comment['snippet']['topLevelComment']['snippet']['authorDisplayName'],
-                        'Comment_PublishedAt': comment['snippet']['topLevelComment']['snippet']['publishedAt']
-                    }
-                    comments.append(data)
-
-                if 'nextPageToken' in response:
-                    request = youtube.commentThreads().list(
-                        part="snippet",
-                        textFormat="plainText",
-                        videoId=video_id,
-                        maxResults=50,
-                        pageToken=response.get('nextPageToken')
-                    )
-                else:
-                    break
-        except HttpError as e:
-            if e.resp.status == 403 and 'disabled comments' in str(e):
-                data = {
-                    'Video_Id': video_id,
-                    'Comment_Id': f'comments_disabled_{video_id}',
-                    'Comment_Text': 'comments_disabled',
-                    'Comment_Author': 'comments_disabled',
-                    'Comment_PublishedAt': 'comments_disabled'
-                }
-                comments.append(data)
-                print(f"Comments are disabled for video: {video_id}")
-            else:
-                print(f"An error occurred while retrieving comments for video: {video_id}")
-                print(f"Error details: {e}")
-
-    return comments
+    subtitle='<p style="font-family:Times New Roman; color:#282828; font-size: 25px;">Get Youtube channel details with this app...</p>'
+    st.markdown(subtitle, unsafe_allow_html=True)
 
 
-def bind_data(channel_id):
-    channel_stats = get_channel_stats(channel_id)
-    playlist_id = channel_stats['Playlist_Id']
-    video_ids = get_video_ids(playlist_id)
-    video_details = get_video_details(video_ids)
-    video_comments = get_video_comments(video_ids)
-
-    data = {
-        "Channel_Name": channel_stats
+    # Input fields for API key and Channel ID
+    #api_key = st.text_input("Enter your API Key:", type="password", key="api_key")
+    channel_id = st.text_input("Enter the Channel ID to get the data:", key="channel_id")
+        
+    
+    fetch_json, fetch_text, upload_data, view_channel, migrate_sql, channel_anlysis = st.tabs([" Fetch Json Data ", " Fetch Text Data ", 
+                                                                                            " Upload To MongoDB ", " View Channel Tables", 
+                                                                                            " Migrate To SQL ", " Channel Analysis "])
+    
+    st.markdown(
+    """
+    <style>
+    div[data-baseweb="input"] {
+        width: 500px !important;
     }
+    </style>
+    """,
+    unsafe_allow_html=True)
+    
+    
+    with fetch_json:
+    # Button to fetch JSON data
+        if st.button("Fetch JSON Data"):
+            try:
+                # Call the get_channel_stats function and display the results as JSON
+                data = bind_data(channel_id)
+                st.json(data)
+                st.success("Successfully fetched Json")
+#            except:
+#                st.error("An error occurred. Please check Channel ID.")
+            except Exception as e:
+                    st.error(f"An error occurred while fetching data to MongoDB: {str(e)}")
 
-    for i, video in enumerate(video_details, 1):
-        video_id = f"Video_Id_{i}"
-        comments = {}
+    with fetch_text:
+    # Button to fetch data and display as text
+        if st.button("Fetch Text Data"):
+            try:
+                # Call the get_channel_stats function and display the results as text
+                data = bind_data(channel_id)
+                text_output = format_data_as_text(data)
+                st.text(text_output)
+            except:
+                st.error("An error occurred. Please check Channel ID.")
+    
+    with upload_data:
+        if st.button("Upload To MongoDB"):
+            with st.spinner("Uploading data to MongoDB..."):
+                try:
+                    upload_to_MongoDB(channel_id)
+                    time.sleep(3)
+                    st.success("Data uploaded successufully")
+                except:
+                    st.error("An error occurred while uploading data to MongoDB")
+                
+    with view_channel:
+        
+        Document_list = view_channel_name()
+        selected_channel = st.selectbox("Select a channel", Document_list)
+        
+        if selected_channel:
+            
+            view_table =  st.button("View Table")
+            
+            if view_table:
+                with st.spinner("Fetching data from MongoDB..."):
+                    try:
+                        channel_stats = channelStats_from_MongoDB()  # Convert DataFrame only once
+                        playlist_stats = playlistStats_from_MongoDB()
+                        comment_stats = commentStats_from_MongoDB()
+                        video_stats = videoStats_from_MongoDB()
+                        selected_channelStats = channel_stats[channel_stats["channel_name"] == selected_channel]
+                        selected_playlistStats = playlist_stats[playlist_stats["channel_name"] == selected_channel]
+                        selected_commentStats = comment_stats[comment_stats["channel_name"] == selected_channel]
+                        selected_videoStats = video_stats[video_stats["channel_name"] == selected_channel]
+                        
+                        if not selected_channelStats.empty:
+                            st.write("Table: Channel")
+                            st.dataframe(selected_channelStats)
+            
+                        if not selected_playlistStats.empty:
+                            st.write("Table: Playlist")
+                            st.dataframe(selected_playlistStats)
+                            
+                        if not selected_commentStats.empty:
+                            st.write("Table: Comment")
+                            st.dataframe(selected_commentStats)
+                            
+                        if not selected_videoStats.empty:
+                            st.write("Table: Video")
+                            st.dataframe(selected_videoStats)
+                            st.success("Successfully fetched data from MongoDB!")    
+                                                   
+                    except Exception as e:
+                        st.error(f"An error occurred while fetching data to MongoDB: {str(e)}")
+                        
+    with migrate_sql:
+        
+        st.write('Click to migrate entire tables to PostgreSQL: ')
+        migrate_SQL = st.button("Migrate To SQL")
+               
+        if migrate_SQL:
+            with st.spinner("Uploading data to PostgreSQL..."):
+                try:
+                    create_channel_table()
+                except Exception as e:
+                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                
+                try:
+                    create_playlist_table()
+                except Exception as e:
+                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    
+                try:
+                    create_video_table()
+                except Exception as e:
+                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    
+                try:
+                    create_comment_table()
+                    st.success("Data uploaded successfully to PostgreSQL!") 
+                except Exception as e:
+                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+    
+    with channel_anlysis:
+        select_question =  st.selectbox("Select the question to analyse: ", ('Tap to view',
+                            '1. What are the names of all the videos and their corresponding channels?',
+                            '2. Which channels have the most number of videos, and how many videos do they have?',
+                            '3. What are the top 10 most viewed videos and their respective channels?',
+                            '4. How many comments were made on each video, and what are their corresponding video names?',
+                            '5. Which videos have the highest number of likes, and what are their corresponding channel names?',
+                            '6. What is the total number of likes and dislikes for each video, and what are their corresponding video names?',
+                            '7. What is the total number of views for each channel, and what are their corresponding channel names?',
+                            '8. What are the names of all the channels that have published videos in the year 2022?',
+                            '9. What is the average duration of all videos in each channel, and what are their corresponding channel names?',
+                            '10. Which videos have the highest number of comments, and what are their corresponding channel names?'))
+        
+        if select_question == '1. What are the names of all the videos and their corresponding channels?':
+            st.dataframe(question1())
+        
+        elif select_question == '2. Which channels have the most number of videos, and how many videos do they have?':
+            st.dataframe(question2())
+            
+        elif select_question == "3. What are the top 10 most viewed videos and their respective channels?":
+            st.dataframe(question3())
+            
+        elif select_question == "4. How many comments were made on each video, and what are their corresponding video names?":
+            st.dataframe(question4())
+            
+        elif select_question == "5. Which videos have the highest number of likes, and what are their corresponding channel names?":
+            st.dataframe(question5())
+            
+        elif select_question == "6. What is the total number of likes and dislikes for each video, and what are their corresponding video names?":
+            st.dataframe(question6())
+            
+        elif select_question == "7. What is the total number of views for each channel, and what are their corresponding channel names?":
+            st.dataframe(question7())
+            
+        elif select_question == "8. What are the names of all the channels that have published videos in the year 2022?":
+            st.dataframe(question8())
+            
+        elif select_question == "9. What is the average duration of all videos in each channel, and what are their corresponding channel names?":
+            st.dataframe(question9())
+        
+        elif select_question == "10. Which videos have the highest number of comments, and what are their corresponding channel names?":
+            st.dataframe(question10())
+    
+def format_data_as_text(data):
+    
+    text_output = ""
 
-        for comment in video_comments:
-            if comment == "Comments disabled" or comment["Video_Id"] == video["Video_Id"]:
-                comment_id = f"Comment_Id_{len(comments) + 1}"
-                comments[comment_id] = {
-                    "Comment_Id": comment.get("Comment_Id", "Comments disabled"),
-                    "Comment_Text": comment.get("Comment_Text", "Comments disabled"),
-                    "Comment_Author": comment.get("Comment_Author", "Comments disabled"),
-                    "Comment_PublishedAt": comment.get("Comment_PublishedAt", "Comments disabled")
-                }
+    def format_comments(comments):
+        if not comments:
+            return "No comments available"
 
-        video["Comments"] = comments
-        data[video_id] = video
+        comments_text = ""
+        for comment_id, comment in comments.items():
+            comments_text += f"{comment_id}\n"
+            comments_text += f"Comment ID: {comment['Comment_Id']}\n"
+            comments_text += f"Text: {comment['Comment_Text']}\n"
+            comments_text += f"Author: {comment['Comment_Author']}\n"
+            comments_text += f"Published At: {comment['Comment_PublishedAt']}\n\n"
+        return comments_text.strip()
 
-    return data
+    for key, value in data.items():
+        if key.startswith("Video_Id_"):
+            video_output = ""
+            video_output += f"{key}\n"
+            video_output += f"Video ID: {value['Video_Id']}\n"
+            video_output += f"Title: {value['Video_Name']}\n"
+            description = value['Video_Description'].replace('\n', ' ')
+            video_output += f"Description: {description}\n"
+            video_output += f"Published At: {value['PublishedAt']}\n"
+            video_output += f"Views: {value['View_Count']}\n"
+            video_output += f"Likes: {value['Like_Count']}\n"
+            video_output += f"Dislikes: {value['Dislike_Count']}\n"
+            video_output += f"Favorites: {value['Favorite_Count']}\n"
+            video_output += f"Comments: {value['Comment_Count']}\n"
+            video_output += f"Duration: {value['Duration']}\n"
+            video_output += f"Thumbnail: {value['Thumbnail']}\n"
+            video_output += f"Caption Status: {value['Caption_Status']}\n"
+            video_output += f"\nComments:\n{format_comments(value['Comments'])}\n\n"
+            text_output += video_output
+        elif key == "Channel_Name":
+            channel_output = "\n"
+            channel_output += f"Channel Name: {value['Channel_Name']}\n"
+            channel_output += f"Channel ID: {value['Channel_Id']}\n"
+            channel_output += f"Subscription Count: {value['Subscription_Count']}\n"
+            channel_output += f"Channel Views: {value['Channel_Views']}\n"
+            channel_output += f"Channel Description: {value['Channel_Description']}\n"
+            channel_output += f"Playlist ID: {value['Playlist_Id']}\n"
+            #channel_output += f"Channel Status: {value['Channel_Status']}\n"
+            #channel_output += f"Channel Type: {value['Channel_Type']}\n\n"
+            text_output += channel_output
+
+    return text_output.strip()
+
+
+
+if __name__ == "__main__":
+    main()
