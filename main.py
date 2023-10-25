@@ -1,5 +1,4 @@
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 api_key = 'AIzaSyDg3-srlMiDE9PlHIue2z6NzaNp_UpJMjE'
 youtube = build('youtube', 'v3', developerKey=api_key)
@@ -107,14 +106,13 @@ def get_video_comments(video_ids):
     comments = []
 
     for video_id in video_ids:
-        try:
-            request = youtube.commentThreads().list(
+                request = youtube.commentThreads().list(
                 part="snippet",
                 videoId=video_id,
                 maxResults=50
             )
 
-            while request:
+    while request:
                 response = request.execute()
 
                 for comment in response['items']:
@@ -137,20 +135,7 @@ def get_video_comments(video_ids):
                     )
                 else:
                     break
-        except HttpError as e:
-            if e.resp.status == 403 and 'disabled comments' in str(e):
-                data = {
-                    'Video_Id': video_id,
-                    'Comment_Id': f'comments_disabled_{video_id}',
-                    'Comment_Text': 'comments_disabled',
-                    'Comment_Author': 'comments_disabled',
-                    'Comment_PublishedAt': 'comments_disabled'
-                }
-                comments.append(data)
-                print(f"Comments are disabled for video: {video_id}")
-            else:
-                print(f"An error occurred while retrieving comments for video: {video_id}")
-                print(f"Error details: {e}")
+
 
     return comments
 
