@@ -17,7 +17,23 @@ def main():
             page_icon= "youtubeMain.png",
             layout="wide"
     )
-   
+    background_image_path = "bk1.jpg"
+    background_image_style = f"""
+    body {{
+        background-image: url('{background_image_path}'),
+        background-size: cover,
+        background-repeat: no-repeat,
+        background-attachment: fixed,
+    }}"""
+
+    st.markdown(f"""
+    <style>
+    {background_image_style}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
     st.image('youtubeMain.png',width=150)
     title = '<p style="font-family:Times New Roman; color:#FF0000; font-size: 48px;">YouTube Data Harvesting and Warehousing</p>'
     st.markdown(title, unsafe_allow_html=True)
@@ -31,7 +47,7 @@ def main():
     channel_id = st.text_input("Enter the Channel ID to get the data:", key="channel_id")
         
     
-    fetch_json, fetch_text, upload_data, view_channel, migrate_sql, channel_anlysis = st.tabs([" Fetch Json Data ", " Fetch Text Data ", 
+    get_text, upload_data, view_channel, migrate_sql, channel_anlysis = st.tabs([" Get Text Data ", 
                                                                                             " Upload To MongoDB ", " View Channel Tables", 
                                                                                             " Migrate To SQL ", " Channel Analysis "])
     
@@ -45,23 +61,10 @@ def main():
     """,
     unsafe_allow_html=True)
     
-    
-    with fetch_json:
-    # Button to fetch JSON data
-        if st.button("Fetch JSON Data"):
-            try:
-                # Call the get_channel_stats function and display the results as JSON
-                data = bind_data(channel_id)
-                st.json(data)
-                st.success("Successfully fetched Json")
-#            except:
-#                st.error("An error occurred. Please check Channel ID.")
-            except Exception as e:
-                    st.error(f"An error occurred while fetching data to MongoDB: {str(e)}")
 
-    with fetch_text:
+    with get_text:
     # Button to fetch data and display as text
-        if st.button("Fetch Text Data"):
+        if st.button("Get channel Data"):
             try:
                 # Call the get_channel_stats function and display the results as text
                 data = bind_data(channel_id)
@@ -131,23 +134,23 @@ def main():
                 try:
                     create_channel_table()
                 except Exception as e:
-                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    st.error(f"An error occurred while uploading data to PostgreSQL-channel: {str(e)}")
                 
                 try:
                     create_playlist_table()
                 except Exception as e:
-                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    st.error(f"An error occurred while uploading data to PostgreSQL-playlist: {str(e)}")
                     
                 try:
                     create_video_table()
                 except Exception as e:
-                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    st.error(f"An error occurred while uploading data to PostgreSQL-video: {str(e)}")
                     
                 try:
                     create_comment_table()
                     st.success("Data uploaded successfully to PostgreSQL!") 
                 except Exception as e:
-                    st.error(f"An error occurred while uploading data to PostgreSQL: {str(e)}")
+                    st.error(f"An error occurred while uploading data to PostgreSQL-comment: {str(e)}")
     
     with channel_anlysis:
         select_question =  st.selectbox("Select the question to analyse: ", ('Tap to view',
